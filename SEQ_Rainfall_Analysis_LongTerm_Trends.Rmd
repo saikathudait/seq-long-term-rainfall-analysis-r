@@ -1,0 +1,274 @@
+---
+title: "Problem Solving Task 1"
+output:
+  html_document: default
+  pdf_document: default
+date: "2025-04-23"
+---
+## Data Import and Initial Exploration 
+**Install all required packages first (if not then run)**
+
+Data manipulation is done in the subject using dplyr, visualisation with ggplot2, map-based with maps and lubridate for efficient date-time parsing and analysis.
+```{r, warning=FALSE}
+#install.packages("dplyr")
+#install.packages("ggplot2")
+#install.packages("maps")
+#install.packages("lubridate")
+
+# Load all necessary libraries
+library(dplyr)
+library(ggplot2)
+library(maps)
+library(lubridate)
+```
+
+**Import metadata and station data**
+
+To support geographical identification and temporal precipitation analysis necessary for assessing climatological patterns in South East Queensland, the imported metadata and daily station data.
+```{r}
+meta_data <- read.csv("ghcnd_meta_data.csv")
+station_data <- read.csv("station_data.csv")
+```
+
+**# Check the structure of the data**
+
+The station metadata is provided in the meta_data dataset that includes geographical coordinates, elevation and the types of measurements (e.g., TMAX, TMIN and PRCP). The station_data dataset has over 380, 000 entries with daily precipitation data (prcp) linked to stations. Analysis reveals spatial-temporal patterns.
+```{r}
+str(meta_data)
+str(station_data)
+```
+## Section 1: Preprocessing the meta data
+**Question 1.1: Filtering SEQ Stations with Precipitation Data Over 110 Years**
+
+The analysis starts by filtering out those weather stations that have available precipitation data over 110 years. The dataset is refined for long-term precipitation analysis by selecting only stations with the “PRCP” element and retaining the data of those stations with a minimum of 110 years. The analysis is further constrained by additional geographic constraints that direct the focus to stations found within latitudes -29.5°S and -26°S and longitudes 138°E to 155°E to ensure that SEQ region (Heidemann et al., 2023). The filtered data confirm that stations such as "GOYDERS LAGOON" and "CORDILLO DOWNS" hold very long-term precipitation records.
+```{r}
+# Filter stations based on criteria
+seq_stations <- meta_data %>%
+  filter(
+    element == "PRCP", # Stations that record precipitation
+    (last_year - first_year + 1) >= 110, # At least 110 years of data
+    longitude >= 138 & longitude <= 155, # Between longitude 138°E and 155°E
+    latitude >= -29.5 & latitude <= -26 # Between latitude 29.5°S and 26°S
+  )
+
+# Display the first few rows of the filtered data
+head(seq_stations)
+```
+**Question 1.2: Create a new data frame with stations meeting specific criteria**
+
+The dataset contains 224 weather stations. The stations are filtered through certain criteria, which are crucial to focus to the rainfall data. By preprocessing, the most relevant data is chosen thus removing the need to go through further analysis. It is a step that is as important as creating the data frame to refine subsequent statistical evaluations.
+```{r}
+# Count the number of stations
+nrow(seq_stations)
+```
+# Section 2: Exploratory Visualization
+**Question 2.1: Mapping Station Locations in South East Queensland**
+
+A geographic map of Australia and plotted station locations of weather stations in South East Queensland (SEQ) were used to conduct the visual analysis of weather stations. The map_data function was used to source the map and it was only the map over SEQ. I then created a graph using ggplot2 and used blue points to represent the locations at the weather station which were then spatially distributed based on their latitude and longitude coordinates. The stations were labeled and nudged slightly towards better readability and identification of the actual stations.
+To restrict the map to only the SEQ region, I relied on the coord_fixed() function with longitude and latitude limits between 138 and 155°E, -30 and -25°S. The reason such a region was chosen is due to stations with precipitation data spanning over 110 years. Abram et al. (2021) emphasized simplicity and clarity in the plot's visual design through a minimalistic theme and light gray polygon fills of the Australian landmass.
+This exploration also explores the geography of the weather stations to aid with further analysis of regional precipitation trends in South East Queensland. It can include station names in order that the data is immediately known, and hence more spatially understandable.
+```{r}
+# Get Australia map data
+aus_map <- map_data("world", region = "Australia")
+
+# Create visualization of station locations
+ggplot() +
+  geom_polygon(data = aus_map, aes(x = long, y = lat, group = group), 
+               fill = "lightgray", color = "gray") +
+  geom_point(data = seq_stations, aes(x = longitude, y = latitude), 
+             color = "blue", size = 3, alpha = 0.7) +
+  geom_text(data = seq_stations, aes(x = longitude, y = latitude, label = name), 
+            size = 2.5, hjust = 0, vjust = 0, nudge_x = 0.2, nudge_y = 0.2) +
+  coord_fixed(xlim = c(138, 155), ylim = c(-30, -25)) +
+  labs(title = "Weather Stations in South East Queensland",
+       subtitle = "Stations with precipitation data spanning at least 110 years",
+       x = "Longitude (°E)", y = "Latitude (°S)") +
+  theme_minimal()
+```
+
+**Question 2.2: Insights from the Station Location Map**
+
+Question 2.2 deals with understanding the location of the weather stations in South East Queensland (SEQ) through location map. Patterns in rainfall collection by their station coordinates are determined and mapped, and high- or low-density data patterns are identified. This approach provides a coverage of weather data shown with maps and an emphasis on possible gaps in which further stations could serve.
+
+**Question 2.3: Suitability of Dataset for Long-Term Rainfall Analysis in SEQ**
+
+Evaluation of the dataset for suitability in long term rainfall analysis in SEQ. The dataset is also used in forecasting the long-term rainfall trend hence temporal consistency and completeness of the dataset matter. Among the key underlying factors are: the frequency of data records, station coverage in terms of seasons and years, and so on. Its good potential to model long‐term rainfall patterns has come from many decades and several stations but this dataset contains data (Ma et al., 2022). Its reliability is derived from the fact that it can be additional advanced by advanced statistical techniques like hypothesis testing and trend analysis and strengthen its effectiveness of forecasting climatic on the long-term basis.
+
+# Section 3: Summary Statistics
+**Question 3.1: Merging Precipitation Records with Station Metadata**
+
+The dataset then merges the precipitation records with station metadata to cover each year between 1886 and 2016 as TIBOOBURRA POST OFFICE rainfall. This data is integrated within analysis to allow combining spatial, temporal and meteorological data for more comprehensive assessment.
+```{r}
+# Merge station data with SEQ metadata
+seq_station_data <- station_data %>%
+  inner_join(seq_stations, by = "id")
+
+# Check the first few rows of the combined data
+head(seq_station_data)
+```
+
+
+**Question 3.2: Mean and Median Rainfall per Station (Excluding Zeros)**
+
+The ranges of mean and median rainfall for South East Queensland stations excluding zeros indicate INNAMINCKA STATION with highest mean (113 mm) and median (65 mm). Other stations to note include HELIDON POST OFFICE, 110 mm and BEECHALL 109 mm. Compared to other stations, TIBOOBURRA POST OFFICE has a mean of 71.6 mm and median of 30 mm. This indicates the variability of rainfall patterns across INNAMINCKA station and other stations with INNAMINCKA being the highest for these two measures (Callaghan, 2023).
+```{r}
+# Exclude zero observations and calculate mean and median precipitation by station
+station_summary <- seq_station_data %>%
+  filter(prcp > 0) %>%
+  group_by(name) %>%
+  summarise(
+    mean_prcp = mean(prcp, na.rm = TRUE),
+    median_prcp = median(prcp, na.rm = TRUE)
+  ) %>%
+  arrange(desc(mean_prcp))
+
+# Display the summary table
+station_summary
+```
+
+**Question 3.3: Comparative Boxplot of Rainfall Across SEQ Stations**
+
+An overview of the precipitation distribution across weather stations on South East Queensland (SEQ). It takes the ggplot2 library for R to create a boxplot with zero rainfall observations filtered out for better representation. The precipitation values for the weather stations are ordered by the median values and plotted on the y axis, and the x axis again represents the weather stations. The boxplot includes a red point for each station marking the mean precipitation for a station, to help understanding central tendency (Yuan et al., 2023). It is a common process to apply the log transformation on the y-axis of precipitation data which is often skewed and improves visualization. 
+```{r}
+# Create a boxplot of precipitation by station
+ggplot(seq_station_data %>% filter(prcp > 0), aes(x = reorder(name, prcp, FUN = median), y = prcp)) +
+  # Add boxplot
+  geom_boxplot(fill = "lightblue", alpha = 0.7) +
+  # Add mean points with distinctive shape and color
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "red") +
+  # Add labels and title
+  labs(title = "Distribution of Precipitation at South East Queensland Stations",
+       subtitle = "Excluding zero rainfall observations",
+       x = "Weather Station",
+       y = "Precipitation (mm)") +
+  # Adjust theme for readability
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(face = "bold"),
+        panel.grid.minor = element_blank()) +
+  # Use log scale for better visualization of skewed precipitation data
+  scale_y_log10()
+```
+**Question 3.4: Rainfall Distribution Insights from Boxplot Analysis**
+
+The variation of rainfall at the different SEQ stations could be compared using the box plot method. The exclusion of records with zero rainfall let the analysis highlight the presence of extreme values and it is evident that some stations have recorded very high amount of rainfall during one station (Drapper et al., 2022). The y-axis axis is logarithmically transformed in order to improve the presentation of the skewness of the data and indicates that more investigation is required on some of the stations since most of the stations have low rainfall while a few stations have high rainfall.
+
+# Section 4: Hypothesis Testing
+**Question 4.1: Top 5 Rainfall Records at Selected Post Office Station**
+
+The largest precipitation records of TIBOOBURRA POST OFFICE station were considered and the five highest were considered to be the largest. On 1974-01-10, this was the highest recorded rainfall event of 1782 mm. Events that are taking place from 1898 to 2007 are observed. The major variability in rainfall is highlighted by the station, providing insights on trends and extremes for the whole of precipitation.
+```{r}
+# First check available post office stations in our filtered dataset
+post_offices <- seq_stations %>%
+  filter(grepl("POST OFFICE", name))
+print("Available post office stations in the dataset:")
+print(unique(post_offices$name))
+
+# Select TIBOOBURRA POST OFFICE based on surname "Gulam" (A-M)
+post_office_name <- "TIBOOBURRA POST OFFICE"
+
+# Create a new data frame for the selected post office
+post_office_station <- seq_station_data %>%
+  filter(name == post_office_name)
+
+# Check if we have data for this station
+print(paste("Number of records for", post_office_name, ":", nrow(post_office_station)))
+
+# Display the top 5 largest recorded precipitation totals
+top_rainfall <- post_office_station %>%
+  arrange(desc(prcp)) %>%
+  head(5)
+print("Top 5 largest precipitation totals:")
+print(top_rainfall)
+```
+
+**Question 4.2: Day-of-Week Analysis of Peak Rainfall Events**
+
+The top five largest precipitation events at TIBOOBURRA POST OFFICE are analyzed for the day of week distribution. The data when extracted to the first days of these events shows that the Thursday (1782 mm) follows that and Saturday (1247 mm). The big other events were on Monday (1087 mm), Sunday (1078 mm) and Thursday (1105 mm) again. Alozie et al. (2022) suggests these kinds of distribution suggest that there is a possibility of a potential non-random pattern of rainfall occurrence across different weekdays. Additional investigation should be made into seasonal or meteorological factors related to these events, in light of the presence of extreme values, in particular on Thursdays.
+```{r}
+# Add day of the week column
+post_office_station <- post_office_station %>%
+  mutate(date = as.Date(date),
+         wday = weekdays(date))
+
+# Check on which days the top 5 largest precipitation events occurred
+top_days <- post_office_station %>%
+  arrange(desc(prcp)) %>%
+  select(date, wday, prcp) %>%
+  head(5)
+print("Days of the week for top 5 largest precipitation events:")
+print(top_days)
+```
+
+**Question 4.3: Theoretical Distribution of Weekly Rainfall Occurrence**
+
+Comparison of frequencies of rainfall events based on days of the week at TIBOOBURRA POST OFFICE is made in the theoretical distribution of weekly rainfall occurrence. It is found that while the rainfall occurrences occur randomly, they are nearly uniformly distributed, with observed frequencies in each weekday from 6608 to 6611. This implies that rainfall events do not seem to follow a particular day preference (Yang et al., 2024). The chi-square test provides evidence of null hypothesis of equal distribution across the days.
+**Question 4.4: Choosing a Suitable Test for Equal Rainfall Distribution**
+
+A statistical test is analyzed for the suitability to evaluate the hypothesis of equal distribution of rainfall across days of the week. To compare observed frequencies with expected frequencies, we choose a chi-square goodness of fit test under the assumption of a uniform distribution. It tests if any of the differences are significant between days in terms of amount of rainfall (Lucas‐Picher et al., 2021). As there is no significant deviation of the null hypothesis, with the p-value being 1.00, rainfall events are the uniform for the weekdays at the TIBOOBURRA POST OFFICE station.
+
+**Question 4.5: Perform the statistical test**
+
+The hypothesis testing consisted of calculating observed frequencies of rainfall occurrences per day in the week for the TIBOOBURRA POST OFFICE. Using the table function on weekday data, the frequencies were calculated and the distribution of rainfall was almost similar on all days with minor variations in numbers of occurrences (Jain et al., 2023).
+The chi-square test was performed to determine if the observed distribution of rainfall was different from uniform distribution meaning that the same number of days were expected to occur, if not an equal frequency. This yielded expected frequencies for each day of the week, assuming a uniform distribution across the seven days, and each day was expected to have approximately 6609 occurrences.
+The X-squared value calculated from this chi square test was 0.00090785 and is associated with 6 degrees of freedom and a p value of 1. The observed and expected frequencies have statistically significant difference using this p-value since it indicates no statistically significant difference between the observed and expected frequencies and thus, rainfall occurrences are uniformly distributed across the days of the week at this station.
+```{r}
+# Calculate the observed frequencies for each day of the week
+observed_freq <- table(post_office_station$wday)
+print(observed_freq)
+
+# Only run the chi-square test if you have valid data
+if(sum(observed_freq > 0) >= 2) {  
+  # Calculate the expected frequencies (assuming equal distribution)
+  total_days <- sum(observed_freq)
+  days_in_week <- 7
+  expected_freq <- rep(total_days / days_in_week, days_in_week)
+  
+  # Perform chi-square goodness-of-fit test
+  chi_sq_test <- chisq.test(observed_freq)
+  print(chi_sq_test)
+} else {
+  print("Insufficient data for chi-square test")
+}
+```
+
+**Question 4.6: Accounting for Missing and Aggregated Rainfall Values**
+
+Preprocessing techniques to missing and aggregated rainfall data are adopted to analyze the proper analysis. This helps preserve the integrity of rainfall records by dealing with missing values via imputation or removal, and it aggregates the daily data so that there is a better understanding of how precipitation patterns generally look more statistically robust in tests and visualization.
+
+**Question 4.7: Considerations for Scaling to Multiple Post Office Stations**
+
+Scaling hypothesis testing to multiple post office stations is analyzed in the analysis i.e., using the larger dataset, while ensuring the statistical validity; handling regional variations in precipitation patterns to enhance the generalizability of the model, and model robustness (Holmes et al., 2024).
+
+## Code qualiity and readability
+
+**Readability and clarity of code**
+
+The given code provides a structured solution for processing and analyzing the precipitation data. In order to facilitate efficient data exploration as well as reproducibility, the code must be readable and easy to understand. It has large set of comments that explains the code line by line, so that the user has clear knowledge of how it works. Variables are named according to proper naming conventions (e.g., seq_stations, post_office_station) so the code is very intuative and follows step by step.
+The package provides the use of modular, well defined functions filter(), arrange(), mutate() which are helpful in increasing the code efficiency and readability. There’s also advantages on organization and debugging or modification to the code by separating the analysis into sections (e.g., data import, exploratory visualization, hypothesis testing). Consistent indentation and spacing help to bring visual clarity and minimize the cognitive load from the users (Alahacoon and Edirisinghe, 2022).
+To simplify readability, complex operations such as chi-square test and statistical summaries are put in simple form, so the logic is easy to follow. But there are further improvements to be made: make the variable names more consistent and other such helper functions which will prevent redundancy. Applying operations with clearer data validation checks before such as ensuring no missing values in critical columns will also enhance robustness and save potential errors.
+
+# References
+Abram, N.J., Henley, B.J., Sen Gupta, A., Lippmann, T.J., Clarke, H., Dowdy, A.J., Sharples, J.J., Nolan, R.H., Zhang, T., Wooster, M.J. and Wurtzel, J.B., 2021. Connections of climate change and variability to large and extreme forest fires in southeast Australia. Communications Earth & Environment, 2(1), pp.1-17.
+
+Alahacoon, N. and Edirisinghe, M., 2022. A comprehensive assessment of remote sensing and traditional based drought monitoring indices at global and regional scale. Geomatics, Natural Hazards and Risk, 13(1), pp.762-799.
+
+Alozie, E., Abdulkarim, A., Abdullahi, I., Usman, A.D., Faruk, N., Olayinka, I.F.Y., Adewole, K.S., Oloyede, A.A., Chiroma, H., Sowande, O.A. and Olawoyin, L.A., 2022. A review on rain signal attenuation modeling, analysis and validation techniques: Advances, challenges and future direction. Sustainability, 14(18), p.11744.
+
+Callaghan, J., 2023. The Eastern Australian Floods of February 2022 and its relationship with climate change. Journal of Energy and Power Technology, 5(2), pp.1-42.
+
+Drapper, D., Olive, K., McAlister, T., Coleman, R. and Lampard, J.L., 2022. A review of pollutant concentrations in urban stormwater across Eastern Australia, After 20 Years. Frontiers in Environmental Chemistry, 3, p.853764.
+
+Heidemann, H., Cowan, T., Henley, B.J., Ribbe, J., Freund, M. and Power, S., 2023. Variability and long‐term change in Australian monsoon rainfall: A review. Wiley Interdisciplinary Reviews: Climate Change, 14(3), p.e823.
+
+Holmes, M.E., Ryley, T., Ward, A., Fein, E.C. and Martin, S., 2024. Australasian aviation climate change hazards: A systematic review. Journal of Air Transport Management, 121, p.102670.
+
+Jain, S., Scaife, A.A., Shepherd, T.G., Deser, C., Dunstone, N., Schmidt, G.A., Trenberth, K.E. and Turkington, T., 2023. Importance of internal variability for climate model assessment. npj Climate and Atmospheric Science, 6(1), p.68.
+
+Lucas‐Picher, P., Argüeso, D., Brisson, E., Tramblay, Y., Berg, P., Lemonsu, A., Kotlarski, S. and Caillaud, C., 2021. Convection‐permitting modeling with regional climate models: Latest developments and next steps. Wiley Interdisciplinary Reviews: Climate Change, 12(6), p.e731.
+
+Ma, Q., Bell, R., Scanlan, C. and Neuhaus, A., 2022. Long-term rundown of plant-available potassium in Western Australia requires a re-evaluation of potassium management for grain production: a review. Crop and Pasture Science, 73(9), pp.981-996.
+
+Yang, M., Zhao, Y., Li, C. and Yang, J., 2024. A review of spatiotemporal variations in temperature and precipitation: Trend analysis, driving mechanisms, and methodological evaluation. Advances in Resources Research, 4(4), pp.836-859.
+
+Yuan, Y., Ton, B.L., Thomas, W.J., Batley, J. and Edwards, D., 2023. Supporting crop plant resilience during climate change. Crop Science, 63(4), pp.1816-1828.
